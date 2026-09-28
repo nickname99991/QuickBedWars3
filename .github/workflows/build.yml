@@ -1,0 +1,41 @@
+name: Build QuickBedWars
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+
+      - name: Download Gradle
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-2.14.1-bin.zip
+          unzip -q gradle-2.14.1-bin.zip
+
+      - name: Build mod
+        run: |
+          chmod +x gradlew 2>/dev/null || true
+          ./gradlew build --no-daemon
+
+      - name: Show built files
+        run: |
+          echo "Files in build/libs:"
+          ls -lh build/libs/
+
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuickBedWars-Mod
+          path: build/libs/*.jar
+          if-no-files-found: error
