@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Java 8
@@ -23,102 +23,50 @@ jobs:
           wget -q https://services.gradle.org/distributions/gradle-2.14.1-bin.zip
           unzip -q gradle-2.14.1-bin.zip
 
-      - name: Find project ZIP
+      - name: Find ZIP
         run: |
-          ZIP=$(find "$GITHUB_WORKSPACE" \
-            -type f \
-            -name "*.zip" \
-            ! -name "gradle-2.14.1-bin.zip" \
-            -print -quit)
+          ZIP=$(find . -type f -name "*.zip" ! -name "gradle-2.14.1-bin.zip" -print -quit)
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
 
-          if [ -z "$ZIP" ]; then
-            echo "ERROR: Project ZIP not found!"
-            exit 1
-          fi
-
-          echo "PROJECT_ZIP=$ZIP" >> "$GITHUB_ENV"
-          echo "Found: $ZIP"
-
-      - name: Extract project
+      - name: Extract Project
         run: |
           rm -rf project
           mkdir project
-          unzip -q "$PROJECT_ZIP" -d project
+          unzip -q "$ZIP" -d project
 
-      - name: Find Gradle project
+      - name: Find Project
         run: |
-          BUILD_FILE=$(find project \
-            -type f \
-            -name "build.gradle" \
-            -print -quit)
-
-          if [ -z "$BUILD_FILE" ]; then
-            echo "ERROR: build.gradle not found!"
-            find project -type f | sort
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$BUILD_FILE")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Project: $PROJECT_DIR"
+          BUILD=$(find project -type f -name "build.gradle" -print -quit)
+          DIR=$(dirname "$BUILD")
+          echo "DIR=$DIR" >> "$GITHUB_ENV"
 
       - name: Fix ClientRegistry
         run: |
-          FILE=$(find project \
-            -type f \
-            -name "QuickBedWars.java" \
-            -print -quit)
+          FILE=$(find project -type f -name "QuickBedWars.java" -print -quit)
+          sed -i 's/import net\.minecraftforge\.client\.ClientRegistry;/import net.minecraftforge.fml.client.registry.ClientRegistry;/' "$FILE"
 
-          if [ -z "$FILE" ]; then
-            echo "ERROR: QuickBedWars.java not found!"
-            exit 1
-          fi
-
-          sed -i \
-            's/import net\.minecraftforge\.client\.ClientRegistry;/import net.minecraftforge.fml.client.registry.ClientRegistry;/' \
-            "$FILE"
-
-          grep "ClientRegistry" "$FILE"
-
-      - name: Build mod
+      - name: Build
         run: |
-          cd "$PROJECT_DIR"
+          cd "$DIR"
+          "$GITHUB_WORKSPACE/gradle-2.14.1/bin/gradle" clean build --no-daemon
 
-          "$GITHUB_WORKSPACE/gradle-2.14.1/bin/gradle" \
-            clean build \
-            --no-daemon
-
-      - name: Check JAR
+      - name: Prepare ONLY JAR
         run: |
-          JAR=$(find "$PROJECT_DIR/build/libs" \
-            -type f \
-            -name "*.jar" \
-            ! -name "*sources*" \
-            ! -name "*dev*" \
-            -print -quit)
+          JAR=$(find "$DIR/build/libs" -type f -name "*.jar" ! -name "*sources*" ! -name "*dev*" -print -quit)
 
-          if [ -z "$JAR" ]; then
-            echo "ERROR: JAR not found!"
-            find "$PROJECT_DIR/build" -type f | sort
-            exit 1
-          fi
-
-          echo "================================"
-          echo "JAR FOUND:"
+          echo "Found JAR:"
           echo "$JAR"
-          echo "================================"
 
-          echo "JAR SIZE:"
-          ls -lh "$JAR"
+          rm -rf release
+          mkdir release
+          cp "$JAR" release/QuickBedWars.jar
 
-          echo "JAR CONTENTS:"
-          unzip -l "$JAR"
+          echo "Release contents:"
+          ls -lh release/
 
-          cp "$JAR" "$GITHUB_WORKSPACE/QuickBedWars.jar"
-
-      - name: Upload JAR
+      - name: Upload ONLY JAR
         uses: actions/upload-artifact@v4
         with:
-          name: QuickBedWars-JAR
-          path: QuickBedWars.jar
+          name: QuickBedWars-Mod
+          path: release/QuickBedWars.jar
           if-no-files-found: error
