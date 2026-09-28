@@ -1,0 +1,11 @@
+[
+  {
+    "modid": "quickbedwars",
+    "name": "QuickBedWars",
+    "description": "Quick BedWars compass menu mod.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "authorList": ["QuickBedWars"],
+    "dependencies": []
+  }
+]
