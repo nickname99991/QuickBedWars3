@@ -23,17 +23,17 @@ jobs:
           wget -q https://services.gradle.org/distributions/gradle-2.14.1-bin.zip
           unzip -q gradle-2.14.1-bin.zip
 
-      - name: Build mod
+      - name: Build Mod
         run: |
-          chmod +x gradlew 2>/dev/null || true
-          ./gradlew build --no-daemon
+          chmod +x gradle-2.14.1/bin/gradle
+          gradle-2.14.1/bin/gradle clean build --no-daemon
 
-      - name: Show built files
+      - name: Check JAR
         run: |
-          echo "Files in build/libs:"
-          ls -lh build/libs/
+          echo "Built files:"
+          find build/libs -type f -maxdepth 1 -print -exec ls -lh {} \;
 
-      - name: Upload JAR
+      - name: Upload Mod
         uses: actions/upload-artifact@v4
         with:
           name: QuickBedWars-Mod
