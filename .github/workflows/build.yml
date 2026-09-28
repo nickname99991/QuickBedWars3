@@ -2,62 +2,54 @@ name: Build QuickBedWars
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 8
+      - name: Set up Java 8
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "8"
+          java-version: '8'
 
-      - name: Download Gradle
+      - name: Download Gradle 2.14.1
         run: |
           wget -q https://services.gradle.org/distributions/gradle-2.14.1-bin.zip
           unzip -q gradle-2.14.1-bin.zip
 
-      - name: Build
+      - name: Build mod
         run: |
-          gradle-2.14.1/bin/gradle clean build --no-daemon
+          ./gradle-2.14.1/bin/gradle clean build --no-daemon
 
-      - name: Find JAR
+      - name: Check JAR contents
         run: |
-          echo "Searching for JAR..."
+          echo "=== Built JARs ==="
+          find . -type f -path "*/build/libs/*.jar" -print
 
-          find . -type f -name "*.jar" \
-            ! -name "*sources*" \
-            ! -name "*dev*" \
-            -print
-
-          JAR=$(find . -type f -name "*.jar" \
-            ! -name "*sources*" \
-            ! -name "*dev*" \
-            -print -quit)
+          echo "=== Checking for QuickBedWars.class ==="
+          JAR=$(find . -type f -path "*/build/libs/*.jar" | head -n 1)
 
           if [ -z "$JAR" ]; then
-            echo "ERROR: NO JAR FOUND"
+            echo "ERROR: No JAR was produced."
             exit 1
           fi
 
-          echo "FOUND:"
-          echo "$JAR"
+          jar tf "$JAR" | grep "QuickBedWars.class"
 
-          mkdir -p release
-          cp "$JAR" release/QuickBedWars.jar
+          echo "=== JAR CONTENTS ==="
+          jar tf "$JAR"
 
-          echo "FINAL FILE:"
-          ls -lh release/QuickBedWars.jar
-
-      - name: Upload ONLY JAR
+      - name: Upload mod JAR
         uses: actions/upload-artifact@v4
         with:
-          name: QuickBedWars-Mod
-          path: release/QuickBedWars.jar
+          name: QuickBedWars-JAR
+          path: "**/build/libs/*.jar"
           if-no-files-found: error
