@@ -23,19 +23,41 @@ jobs:
           wget -q https://services.gradle.org/distributions/gradle-2.14.1-bin.zip
           unzip -q gradle-2.14.1-bin.zip
 
-      - name: Build Mod
+      - name: Build
         run: |
-          chmod +x gradle-2.14.1/bin/gradle
           gradle-2.14.1/bin/gradle clean build --no-daemon
 
-      - name: Check JAR
+      - name: Find JAR
         run: |
-          echo "Built files:"
-          find build/libs -type f -maxdepth 1 -print -exec ls -lh {} \;
+          echo "Searching for JAR..."
 
-      - name: Upload Mod
+          find . -type f -name "*.jar" \
+            ! -name "*sources*" \
+            ! -name "*dev*" \
+            -print
+
+          JAR=$(find . -type f -name "*.jar" \
+            ! -name "*sources*" \
+            ! -name "*dev*" \
+            -print -quit)
+
+          if [ -z "$JAR" ]; then
+            echo "ERROR: NO JAR FOUND"
+            exit 1
+          fi
+
+          echo "FOUND:"
+          echo "$JAR"
+
+          mkdir -p release
+          cp "$JAR" release/QuickBedWars.jar
+
+          echo "FINAL FILE:"
+          ls -lh release/QuickBedWars.jar
+
+      - name: Upload ONLY JAR
         uses: actions/upload-artifact@v4
         with:
           name: QuickBedWars-Mod
-          path: build/libs/*.jar
+          path: release/QuickBedWars.jar
           if-no-files-found: error
