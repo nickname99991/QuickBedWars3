@@ -6,6 +6,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repository
@@ -17,15 +18,13 @@ jobs:
           distribution: temurin
           java-version: "8"
 
-      - name: Download Gradle 2.14.1
+      - name: Download Gradle
         run: |
           wget -q https://services.gradle.org/distributions/gradle-2.14.1-bin.zip
           unzip -q gradle-2.14.1-bin.zip
 
       - name: Find project ZIP
         run: |
-          echo "Searching for project ZIP..."
-
           ZIP=$(find "$GITHUB_WORKSPACE" \
             -type f \
             -name "*.zip" \
@@ -34,23 +33,17 @@ jobs:
 
           if [ -z "$ZIP" ]; then
             echo "ERROR: Project ZIP not found!"
-            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f | sort
             exit 1
           fi
 
-          echo "Found project ZIP:"
-          echo "$ZIP"
-
           echo "PROJECT_ZIP=$ZIP" >> "$GITHUB_ENV"
+          echo "Found: $ZIP"
 
       - name: Extract project
         run: |
           rm -rf project
           mkdir project
-
           unzip -q "$PROJECT_ZIP" -d project
-
-          echo "Project extracted."
 
       - name: Find Gradle project
         run: |
@@ -61,19 +54,13 @@ jobs:
 
           if [ -z "$BUILD_FILE" ]; then
             echo "ERROR: build.gradle not found!"
-
-            echo "Files inside project:"
             find project -type f | sort
-
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$BUILD_FILE")
-
-          echo "Gradle project:"
-          echo "$PROJECT_DIR"
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project: $PROJECT_DIR"
 
       - name: Fix ClientRegistry
         run: |
@@ -84,20 +71,13 @@ jobs:
 
           if [ -z "$FILE" ]; then
             echo "ERROR: QuickBedWars.java not found!"
-
-            find project -type f -name "*.java" | sort
-
             exit 1
           fi
-
-          echo "Java file:"
-          echo "$FILE"
 
           sed -i \
             's/import net\.minecraftforge\.client\.ClientRegistry;/import net.minecraftforge.fml.client.registry.ClientRegistry;/' \
             "$FILE"
 
-          echo "Checking ClientRegistry:"
           grep "ClientRegistry" "$FILE"
 
       - name: Build mod
@@ -108,10 +88,8 @@ jobs:
             clean build \
             --no-daemon
 
-      - name: Find built JAR
+      - name: Check JAR
         run: |
-          echo "Searching for built JAR..."
-
           JAR=$(find "$PROJECT_DIR/build/libs" \
             -type f \
             -name "*.jar" \
@@ -120,22 +98,27 @@ jobs:
             -print -quit)
 
           if [ -z "$JAR" ]; then
-            echo "ERROR: Mod JAR not found!"
-
-            echo "Build files:"
+            echo "ERROR: JAR not found!"
             find "$PROJECT_DIR/build" -type f | sort
-
             exit 1
           fi
 
-          echo "Found mod JAR:"
+          echo "================================"
+          echo "JAR FOUND:"
           echo "$JAR"
+          echo "================================"
+
+          echo "JAR SIZE:"
+          ls -lh "$JAR"
+
+          echo "JAR CONTENTS:"
+          unzip -l "$JAR"
 
           cp "$JAR" "$GITHUB_WORKSPACE/QuickBedWars.jar"
 
-      - name: Upload mod JAR
+      - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
-          name: QuickBedWars
+          name: QuickBedWars-JAR
           path: QuickBedWars.jar
           if-no-files-found: error
