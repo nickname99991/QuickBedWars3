@@ -1,8 +1,8 @@
 package com.example.quickbedwars;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.network.NetworkPlayerInfo;
 import net.minecraft.client.settings.KeyBinding;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.ContainerChest;
 import net.minecraft.util.ChatComponentText;
@@ -20,7 +20,7 @@ import java.util.List;
 @Mod(
         modid = "quickbedwars",
         name = "QuickBedWars",
-        version = "2.0",
+        version = "3.0",
         clientSideOnly = true
 )
 public class QuickBedWars {
@@ -57,35 +57,38 @@ public class QuickBedWars {
         if (waitingForGui)
             return;
 
-        EntityPlayer nearestNpc = findNearestNpc();
+        EntityPlayer npc = findNearestNPC();
 
-        if (nearestNpc == null) {
+        if (npc == null) {
             mc.thePlayer.addChatMessage(
                     new ChatComponentText(
-                            "§c[QuickBedWars] No NPC found."
+                            "§c[QuickBedWars] No NPC nearby."
                     )
             );
             return;
         }
 
-        // Face the nearest NPC
-        faceEntity(nearestNpc);
+        // Face NPC
+        faceNPC(npc);
 
-        // Right click the NPC
+        // Right click NPC
         mc.playerController.interactWithEntitySendPacket(
                 mc.thePlayer,
-                nearestNpc
+                npc
         );
 
-        // Wait for the BedWars GUI
         waitingForGui = true;
         clicked = false;
     }
 
-    private EntityPlayer findNearestNpc() {
+    /*
+     * Find the nearest fake-player NPC.
+     * Real players are normally present in the tab list.
+     */
+    private EntityPlayer findNearestNPC() {
 
         EntityPlayer closest = null;
-        double closestDistance = Double.MAX_VALUE;
+        double closestDistance = 36.0D; // 6 blocks
 
         List<EntityPlayer> players =
                 mc.theWorld.playerEntities;
@@ -98,40 +101,67 @@ public class QuickBedWars {
             double distance =
                     mc.thePlayer.getDistanceSqToEntity(player);
 
-            if (distance < closestDistance) {
-                closestDistance = distance;
-                closest = player;
-            }
+            if (distance > closestDistance)
+                continue;
+
+            if (isRealPlayer(player))
+                continue;
+
+            closestDistance = distance;
+            closest = player;
         }
 
         return closest;
     }
 
-    private void faceEntity(Entity entity) {
+    /*
+     * NPCs are usually not registered in the server tab list.
+     */
+    private boolean isRealPlayer(EntityPlayer player) {
 
-        double x = entity.posX - mc.thePlayer.posX;
+        if (mc.getNetHandler() == null)
+            return false;
 
-        double y = entity.posY +
-                entity.getEyeHeight() -
+        for (NetworkPlayerInfo info :
+                mc.getNetHandler().getPlayerInfoMap()) {
+
+            if (info.getGameProfile().getId()
+                    .equals(player.getUniqueID())) {
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void faceNPC(EntityPlayer npc) {
+
+        double x =
+                npc.posX - mc.thePlayer.posX;
+
+        double y =
+                npc.posY +
+                npc.getEyeHeight() -
                 (mc.thePlayer.posY +
-                        mc.thePlayer.getEyeHeight());
+                mc.thePlayer.getEyeHeight());
 
-        double z = entity.posZ - mc.thePlayer.posZ;
+        double z =
+                npc.posZ - mc.thePlayer.posZ;
 
         double horizontal =
                 Math.sqrt(x * x + z * z);
 
         float yaw =
-                (float) (
-                        Math.atan2(z, x)
-                                * 180.0D / Math.PI
-                ) - 90.0F;
+                (float)
+                (Math.atan2(z, x)
+                * 180.0D / Math.PI)
+                - 90.0F;
 
         float pitch =
-                (float) -(
-                        Math.atan2(y, horizontal)
-                                * 180.0D / Math.PI
-                );
+                (float)
+                -(Math.atan2(y, horizontal)
+                * 180.0D / Math.PI);
 
         mc.thePlayer.rotationYaw = yaw;
         mc.thePlayer.rotationPitch = pitch;
@@ -159,17 +189,10 @@ public class QuickBedWars {
                 (ContainerChest) mc.thePlayer.openContainer;
 
         /*
-         * BedWars GUI:
+         * First green BedWars item:
          *
-         * First row:
-         * 0  1  2  3  4  5  6  7  8
-         *
-         * Second row:
-         * 9  10 11 12 13 14 15 16 17
-         *
-         * First green item = Slot 11
+         * Slot 11
          */
-
         if (chest.inventorySlots.size() > 11) {
 
             mc.playerController.windowClick(
