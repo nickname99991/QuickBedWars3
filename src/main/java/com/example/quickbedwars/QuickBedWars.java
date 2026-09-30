@@ -2,9 +2,9 @@ package com.example.quickbedwars;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.ContainerChest;
-import net.minecraft.init.Items;
-import net.minecraft.item.ItemStack;
 import net.minecraft.util.ChatComponentText;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
@@ -15,10 +15,12 @@ import net.minecraftforge.fml.common.gameevent.InputEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.input.Keyboard;
 
+import java.util.List;
+
 @Mod(
         modid = "quickbedwars",
         name = "QuickBedWars",
-        version = "1.0",
+        version = "2.0",
         clientSideOnly = true
 )
 public class QuickBedWars {
@@ -26,14 +28,16 @@ public class QuickBedWars {
     private final Minecraft mc = Minecraft.getMinecraft();
 
     private KeyBinding key;
-    private boolean waiting = false;
+
+    private boolean waitingForGui = false;
+    private boolean clicked = false;
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
 
         key = new KeyBinding(
-                "Quick BedWars",
-                Keyboard.KEY_K,
+                "Quick BedWars NPC",
+                Keyboard.KEY_L,
                 "QuickBedWars"
         );
 
@@ -50,40 +54,87 @@ public class QuickBedWars {
         if (mc.thePlayer == null || mc.theWorld == null)
             return;
 
-        waiting = true;
+        if (waitingForGui)
+            return;
 
-        for (int slot = 0; slot < 9; slot++) {
+        EntityPlayer nearestNpc = findNearestNpc();
 
-            ItemStack stack =
-                    mc.thePlayer.inventory.getStackInSlot(slot);
+        if (nearestNpc == null) {
+            mc.thePlayer.addChatMessage(
+                    new ChatComponentText(
+                            "§c[QuickBedWars] No NPC found."
+                    )
+            );
+            return;
+        }
 
-            if (stack != null &&
-                    stack.getItem() == Items.compass) {
+        // Face the nearest NPC
+        faceEntity(nearestNpc);
 
-                int oldSlot =
-                        mc.thePlayer.inventory.currentItem;
+        // Right click the NPC
+        mc.playerController.interactWithEntitySendPacket(
+                mc.thePlayer,
+                nearestNpc
+        );
 
-                mc.thePlayer.inventory.currentItem = slot;
+        // Wait for the BedWars GUI
+        waitingForGui = true;
+        clicked = false;
+    }
 
-                mc.playerController.sendUseItem(
-                        mc.thePlayer,
-                        mc.theWorld,
-                        stack
-                );
+    private EntityPlayer findNearestNpc() {
 
-                mc.thePlayer.inventory.currentItem = oldSlot;
+        EntityPlayer closest = null;
+        double closestDistance = Double.MAX_VALUE;
 
-                return;
+        List<EntityPlayer> players =
+                mc.theWorld.playerEntities;
+
+        for (EntityPlayer player : players) {
+
+            if (player == mc.thePlayer)
+                continue;
+
+            double distance =
+                    mc.thePlayer.getDistanceSqToEntity(player);
+
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closest = player;
             }
         }
 
-        waiting = false;
+        return closest;
+    }
 
-        mc.thePlayer.addChatMessage(
-                new ChatComponentText(
-                        "§c[QuickBedWars] Compass not found."
-                )
-        );
+    private void faceEntity(Entity entity) {
+
+        double x = entity.posX - mc.thePlayer.posX;
+
+        double y = entity.posY +
+                entity.getEyeHeight() -
+                (mc.thePlayer.posY +
+                        mc.thePlayer.getEyeHeight());
+
+        double z = entity.posZ - mc.thePlayer.posZ;
+
+        double horizontal =
+                Math.sqrt(x * x + z * z);
+
+        float yaw =
+                (float) (
+                        Math.atan2(z, x)
+                                * 180.0D / Math.PI
+                ) - 90.0F;
+
+        float pitch =
+                (float) -(
+                        Math.atan2(y, horizontal)
+                                * 180.0D / Math.PI
+                );
+
+        mc.thePlayer.rotationYaw = yaw;
+        mc.thePlayer.rotationPitch = pitch;
     }
 
     @SubscribeEvent
@@ -92,26 +143,45 @@ public class QuickBedWars {
         if (event.phase != TickEvent.Phase.END)
             return;
 
-        if (!waiting || mc.thePlayer == null)
+        if (!waitingForGui)
             return;
 
-        if (mc.thePlayer.openContainer instanceof ContainerChest) {
+        if (mc.thePlayer == null)
+            return;
 
-            ContainerChest chest =
-                    (ContainerChest) mc.thePlayer.openContainer;
+        if (!(mc.thePlayer.openContainer instanceof ContainerChest))
+            return;
 
-            if (22 < chest.inventorySlots.size()) {
+        if (clicked)
+            return;
 
-                mc.playerController.windowClick(
-                        chest.windowId,
-                        22,
-                        0,
-                        0,
-                        mc.thePlayer
-                );
+        ContainerChest chest =
+                (ContainerChest) mc.thePlayer.openContainer;
 
-                waiting = false;
-            }
+        /*
+         * BedWars GUI:
+         *
+         * First row:
+         * 0  1  2  3  4  5  6  7  8
+         *
+         * Second row:
+         * 9  10 11 12 13 14 15 16 17
+         *
+         * First green item = Slot 11
+         */
+
+        if (chest.inventorySlots.size() > 11) {
+
+            mc.playerController.windowClick(
+                    chest.windowId,
+                    11,
+                    0,
+                    0,
+                    mc.thePlayer
+            );
+
+            clicked = true;
+            waitingForGui = false;
         }
     }
-    }
+}
