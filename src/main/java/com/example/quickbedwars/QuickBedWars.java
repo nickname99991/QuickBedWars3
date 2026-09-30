@@ -5,6 +5,7 @@ import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.ContainerChest;
+import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.ChatComponentText;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
@@ -20,7 +21,7 @@ import java.util.List;
 @Mod(
         modid = "quickbedwars",
         name = "QuickBedWars",
-        version = "6.0",
+        version = "7.0",
         clientSideOnly = true
 )
 public class QuickBedWars {
@@ -57,50 +58,61 @@ public class QuickBedWars {
         if (waitingForGui)
             return;
 
-        EntityPlayer npc = findNearestPlayer();
+        Entity target = findNearestEntity();
 
-        if (npc == null) {
+        if (target == null) {
             mc.thePlayer.addChatMessage(
                     new ChatComponentText(
-                            "§c[QuickBedWars] No NPC nearby."
+                            "§c[QuickBedWars] No entity nearby."
                     )
             );
             return;
         }
 
-        // Turn toward the nearest NPC
-        faceEntity(npc);
+        // Turn toward the nearest entity
+        faceEntity(target);
 
-        // Right-click the NPC
+        // Right click the entity
         mc.playerController.interactWithEntitySendPacket(
                 mc.thePlayer,
-                npc
+                target
         );
 
-        // Wait for the GUI to open
         waitingForGui = true;
         clicked = false;
     }
 
-    private EntityPlayer findNearestPlayer() {
+    private Entity findNearestEntity() {
 
-        EntityPlayer closest = null;
+        Entity closest = null;
         double closestDistance = 36.0D; // 6 blocks
 
-        List<EntityPlayer> players =
-                mc.theWorld.playerEntities;
+        double range = 6.0D;
 
-        for (EntityPlayer player : players) {
+        AxisAlignedBB box =
+                mc.thePlayer.getEntityBoundingBox()
+                        .expand(range, range, range);
 
-            if (player == mc.thePlayer)
+        List<Entity> entities =
+                mc.theWorld.getEntitiesWithinAABB(
+                        Entity.class,
+                        box
+                );
+
+        for (Entity entity : entities) {
+
+            if (entity == mc.thePlayer)
+                continue;
+
+            if (!entity.canBeCollidedWith())
                 continue;
 
             double distance =
-                    mc.thePlayer.getDistanceSqToEntity(player);
+                    mc.thePlayer.getDistanceSqToEntity(entity);
 
             if (distance < closestDistance) {
                 closestDistance = distance;
-                closest = player;
+                closest = entity;
             }
         }
 
@@ -154,18 +166,13 @@ public class QuickBedWars {
         if (clicked)
             return;
 
-        // Wait until the NPC opens an inventory GUI
         if (!(mc.thePlayer.openContainer instanceof ContainerChest))
             return;
 
         ContainerChest chest =
                 (ContainerChest) mc.thePlayer.openContainer;
 
-        /*
-         * First green BedWars button:
-         * Slot 11
-         */
-
+        // First green BedWars button = Slot 11
         if (chest.inventorySlots.size() > 11) {
 
             mc.playerController.windowClick(
@@ -178,6 +185,12 @@ public class QuickBedWars {
 
             clicked = true;
             waitingForGui = false;
+
+            mc.thePlayer.addChatMessage(
+                    new ChatComponentText(
+                            "§aSuccess Anti Teaming Ban"
+                    )
+            );
         }
     }
-}
+                    }
