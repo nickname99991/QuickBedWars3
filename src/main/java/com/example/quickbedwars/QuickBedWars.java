@@ -1,8 +1,8 @@
 package com.example.quickbedwars;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.network.NetworkPlayerInfo;
 import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.ContainerChest;
 import net.minecraft.util.ChatComponentText;
@@ -20,7 +20,7 @@ import java.util.List;
 @Mod(
         modid = "quickbedwars",
         name = "QuickBedWars",
-        version = "3.0",
+        version = "6.0",
         clientSideOnly = true
 )
 public class QuickBedWars {
@@ -57,7 +57,7 @@ public class QuickBedWars {
         if (waitingForGui)
             return;
 
-        EntityPlayer npc = findNearestNPC();
+        EntityPlayer npc = findNearestPlayer();
 
         if (npc == null) {
             mc.thePlayer.addChatMessage(
@@ -68,24 +68,21 @@ public class QuickBedWars {
             return;
         }
 
-        // Face NPC
-        faceNPC(npc);
+        // Turn toward the nearest NPC
+        faceEntity(npc);
 
-        // Right click NPC
+        // Right-click the NPC
         mc.playerController.interactWithEntitySendPacket(
                 mc.thePlayer,
                 npc
         );
 
+        // Wait for the GUI to open
         waitingForGui = true;
         clicked = false;
     }
 
-    /*
-     * Find the nearest fake-player NPC.
-     * Real players are normally present in the tab list.
-     */
-    private EntityPlayer findNearestNPC() {
+    private EntityPlayer findNearestPlayer() {
 
         EntityPlayer closest = null;
         double closestDistance = 36.0D; // 6 blocks
@@ -101,53 +98,28 @@ public class QuickBedWars {
             double distance =
                     mc.thePlayer.getDistanceSqToEntity(player);
 
-            if (distance > closestDistance)
-                continue;
-
-            if (isRealPlayer(player))
-                continue;
-
-            closestDistance = distance;
-            closest = player;
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closest = player;
+            }
         }
 
         return closest;
     }
 
-    /*
-     * NPCs are usually not registered in the server tab list.
-     */
-    private boolean isRealPlayer(EntityPlayer player) {
-
-        if (mc.getNetHandler() == null)
-            return false;
-
-        for (NetworkPlayerInfo info :
-                mc.getNetHandler().getPlayerInfoMap()) {
-
-            if (info.getGameProfile().getId()
-                    .equals(player.getUniqueID())) {
-
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private void faceNPC(EntityPlayer npc) {
+    private void faceEntity(Entity entity) {
 
         double x =
-                npc.posX - mc.thePlayer.posX;
+                entity.posX - mc.thePlayer.posX;
 
         double y =
-                npc.posY +
-                npc.getEyeHeight() -
+                entity.posY +
+                entity.getEyeHeight() -
                 (mc.thePlayer.posY +
                 mc.thePlayer.getEyeHeight());
 
         double z =
-                npc.posZ - mc.thePlayer.posZ;
+                entity.posZ - mc.thePlayer.posZ;
 
         double horizontal =
                 Math.sqrt(x * x + z * z);
@@ -179,20 +151,21 @@ public class QuickBedWars {
         if (mc.thePlayer == null)
             return;
 
-        if (!(mc.thePlayer.openContainer instanceof ContainerChest))
+        if (clicked)
             return;
 
-        if (clicked)
+        // Wait until the NPC opens an inventory GUI
+        if (!(mc.thePlayer.openContainer instanceof ContainerChest))
             return;
 
         ContainerChest chest =
                 (ContainerChest) mc.thePlayer.openContainer;
 
         /*
-         * First green BedWars item:
-         *
+         * First green BedWars button:
          * Slot 11
          */
+
         if (chest.inventorySlots.size() > 11) {
 
             mc.playerController.windowClick(
